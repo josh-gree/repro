@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "prefect2-agent-repro"
+version = "0.1.0"
+description = ""
+authors = ["josh-gree <joshua.greenhalgh@mobkoi.com>"]
+readme = "README.md"
+packages = [{ include = "prefect2_agent_repro" }]
+
+[tool.poetry.dependencies]
+python = "^3.9.9"
+prefect = "^2.10.12"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

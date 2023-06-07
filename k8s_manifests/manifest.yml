@@ -1,0 +1,113 @@
+---
+# Source: prefect-worker/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prefect-worker
+  namespace: "prefect"
+---
+# Source: prefect-worker/templates/role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: prefect-worker
+  namespace: "prefect"
+rules:
+- apiGroups: [""]
+  resources: ["pods", "pods/log", "pods/status"]
+  verbs: ["get", "watch", "list"]
+- apiGroups: ["batch"]
+  resources: ["jobs"]
+  verbs: [ "get", "list", "watch", "create", "update", "patch", "delete" ]
+---
+# Source: prefect-worker/templates/rolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: prefect-worker
+  namespace: "prefect"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: prefect-worker
+subjects:
+  - kind: ServiceAccount
+    name: prefect-worker
+    namespace: "prefect"
+---
+# Source: prefect-worker/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prefect-worker
+  namespace: "prefect"
+  labels:
+    app: prefect-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prefect-worker
+  template:
+    metadata:
+      labels:
+        app: prefect-worker
+    spec:
+      serviceAccountName: prefect-worker
+      securityContext:
+        fsGroup: 1001
+        runAsNonRoot: true
+        runAsUser: 1001
+      containers:
+        - name: prefect-worker
+          image: "prefecthq/prefect:2.10.12-python3.9-kubernetes"
+          imagePullPolicy: IfNotPresent
+          command:
+            - prefect
+            - worker
+            - start
+            - --type
+            - kubernetes
+            - --pool
+            - default-agent-pool
+            - --work-queue
+            - default
+          workingDir: /home/prefect
+          env:
+            - name: HOME
+              value: /home/prefect
+            - name: PREFECT_AGENT_PREFETCH_SECONDS
+              value: "10"
+            - name: PREFECT_AGENT_QUERY_INTERVAL
+              value: "5"
+            - name: PREFECT_API_ENABLE_HTTP2
+              value: "true"
+            - name: PREFECT_API_URL
+              value: "http://host.docker.internal:4200/api"
+            - name: PREFECT_KUBERNETES_CLUSTER_UID
+              value: ""
+            - name: PREFECT_DEBUG_MODE
+              value: "false"
+          envFrom:
+          resources:
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+            requests:
+              cpu: 100m
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1001
+          volumeMounts:
+            - mountPath: /home/prefect
+              name: scratch
+              subPathExpr: home
+            - mountPath: /tmp
+              name: scratch
+              subPathExpr: tmp
+      volumes:
+        - name: scratch
+          emptyDir: {}
